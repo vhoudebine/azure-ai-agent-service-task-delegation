@@ -8,7 +8,6 @@ This project demonstrates the integration of AI agents with Azure Logic Apps to 
 ## Files
 
 - **`.env.sample`**: Sample environment variables file.
-- **`.gitignore`**: Specifies files and directories to be ignored by git.
 - **`agent_approval_logic_apps.py`**: Demonstrates how to use agents with Logic Apps to send emails.
 - **[`app/backend/app.py`](app/backend/app.py )**: FastAPI backend implementation.
 - **[`app/backend/prompts.py`](app/backend/app.py )**: Contains the system prompt for the AI agent.
@@ -68,16 +67,9 @@ This project demonstrates the integration of AI agents with Azure Logic Apps to 
 - [`agent_id`](app/backend/app.py ): The ID of the agent you want to use, if available.
 - `agent_name`: The name of the agent.
 
-## License
-
-This project is licensed under the MIT License. See the LICENSE file for details.
 
 ## Acknowledgements
 
 - [Azure AI Projects](https://azure.microsoft.com/en-us/services/ai-projects/)
 - [FastAPI](https://fastapi.tiangolo.com/)
 - [Streamlit](https://streamlit.io/)
-
-## Contact
-
-For any inquiries or issues, please contact [your-email@example.com].
