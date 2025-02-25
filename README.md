@@ -2,7 +2,9 @@
 
 ## Overview
 
-This project demonstrates the integration of AI agents with Azure Logic Apps to perform tasks such as sending emails. The application consists of a FastAPI backend and a Streamlit frontend to simulate a chat session and track long-running processes.
+This project demonstrates the integration of AI agents with Azure Logic Apps to perform tasks such as sending emails. 
+
+The application consists of a FastAPI backend and a Streamlit frontend to simulate a chat session and track long-running processes.
 
 ## Project Structure
 ## Files
