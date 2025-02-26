@@ -45,12 +45,23 @@ project_client = AIProjectClient.from_connection_string(
         credential=DefaultAzureCredential(),
         conn_str=os.getenv("project_connection_string"))
     
-   
-def start_long_running_process(feature_spec: str, background_tasks: BackgroundTasks):
+def check_process_status(process_id: str):
+    """
+    Checks the status of a given process.
+    :param process_id (str): The ID of the process to check.
+    :return: status
+    :rtype: str
+    """
+    return processes.get(process_id, "not found")
+
+
+def start_long_running_process(feature_spec: str, thread_id: str = None, background_tasks: BackgroundTasks = None):
     """
     Simulates a long running process (e.g., waiting for email approval).
     After a delay, updates the process status to 'completed'.
     :param feature_spec (str): The feature specification to be processed in dictionary format.
+    :param thread_id (str, optional): The thread ID associated with the process.
+    :param background_tasks (BackgroundTasks, optional): Background tasks manager.
     :return: process_id
     :rtype: str
     """
@@ -58,7 +69,8 @@ def start_long_running_process(feature_spec: str, background_tasks: BackgroundTa
         
     # Start the long running process in the background
     print(f"Starting long running process {process_id}")
-    background_tasks.add_task(simulate_long_process, process_id)
+    if background_tasks:
+        background_tasks.add_task(simulate_long_process, process_id, thread_id)
     processes[process_id] = "running"
     
     return process_id
@@ -130,14 +142,28 @@ async def get_thread(thread_id: str):
     ]
     return ThreadResponse(thread_id=thread_id, messages=filtered_messages)
 
-async def simulate_long_process(process_id: str):
+async def simulate_long_process(process_id: str, thread_id:str):
     """
     Simulates a long running process (e.g., waiting for email approval).
     After a delay, updates the process status to 'completed'.
     """
     print(f"Simulating long running process {process_id}")
     # Simulate a long running process
-    await asyncio.sleep(10)  # 10 seconds delay for simulation
+    await asyncio.sleep(10)
+    project_client.agents.create_message(thread_id=thread_id,
+                                         role="assistant",
+                                         content=f"""
+                                         {{"process_id": {{process_id}}, 
+                                          "steps": 
+                                          [{{
+                                              "step_name": "Legal department approval",
+                                                "status": "requires action",
+                                                "send_to": "User proxy"
+                                                "action": "Legal department wants to know what country this feature should be deployed in, USA or UK? Get the response from the user"
+                                          }},
+                                          ]
+                                         }}
+                                        """)  # 10 seconds delay for simulation
     processes[process_id] = "completed"
 
 @app.post("/chat", response_model=ChatResponse)
@@ -194,7 +220,9 @@ async def chat(chat_request: ChatRequest, background_tasks: BackgroundTasks):
                     if tool_call.function.name =='start_long_running_process':
                         # Start the long running process in the background
                         reqs = json.loads(tool_call.function.arguments).get('feature_spec')
-                        process_id = start_long_running_process("blabla", background_tasks)
+                        process_id = start_long_running_process(reqs, 
+                                                                thread_id=thread_id, 
+                                                                background_tasks=background_tasks)
                         # Notify the user about the long running process
                         response_content = f"Started long running process {process_id} (Status: running)"
                         tool_outputs.append(

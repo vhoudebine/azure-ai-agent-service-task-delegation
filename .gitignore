@@ -1,3 +1,4 @@
 .env
 app/backend/__pycache__/app.cpython-312.pyc
 app/backend/__pycache__/prompts.cpython-312.pyc
+commands.md
