@@ -182,21 +182,6 @@ async def chat(chat_request: ChatRequest, background_tasks: BackgroundTasks):
             raise HTTPException(status_code=404, detail="Thread not found")
         else:
             raise e
-        
-    # If the message contains "long process", we start a long running process.
-    if "long process" in message.lower():
-        process_id = str(uuid.uuid4())
-        processes[process_id] = "running"
-        
-        # Start the long running process in the background
-        background_tasks.add_task(simulate_long_process, process_id)
-        # Notify the user about the long running process
-        response_content = f"Started long running process {process_id} (Status: running)"
-        project_client.agents.create_message(thread_id=thread_id, role="assistant", content=response_content)
-
-        return ChatResponse(
-            response=response_content
-        )
     
     # Send the message to the AI agent
     project_client.agents.create_message(thread_id=thread_id, role="user", content=message)
