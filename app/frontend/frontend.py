@@ -89,7 +89,7 @@ with processes_tab:
         
         if processes:
             for process in processes:
-                st.write(f"**Process ID:** {process['process_id']}  |  **Status:** {process['status']}")
+                st.write(f"**Process ID:** {process['process_id']}  |  **Status:** {process['status']} |  **Message:** {process['message']}")
         else:
             st.write("No processes found.")
     except Exception as e:

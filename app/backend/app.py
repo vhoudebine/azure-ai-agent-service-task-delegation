@@ -5,6 +5,9 @@ from azure.ai.projects.models import MessageTextContent
 from azure.ai.projects.models import FunctionTool, RequiredFunctionToolCall, SubmitToolOutputsAction, ToolOutput
 from azure.identity import DefaultAzureCredential
 from azure.core.exceptions import ResourceNotFoundError
+from azure.servicebus.aio import ServiceBusClient
+from azure.servicebus import ServiceBusMessage
+
 from dotenv import load_dotenv
 from typing import List
 import uuid
@@ -45,6 +48,10 @@ class Process(BaseModel):
 project_client = AIProjectClient.from_connection_string(
         credential=DefaultAzureCredential(),
         conn_str=os.getenv("project_connection_string"))
+
+service_bus_client = ServiceBusClient.from_connection_string(
+        conn_str=os.getenv("service_bus_connection_string"),
+        logging_enable=True)
     
 def check_process_inbox(process_id: str):
     """
@@ -109,6 +116,29 @@ else:
     print('No assistant found, creating one')
     agent = create_agent()
 
+async def run():
+    # create a Service Bus client using the connection string
+    async with service_bus_client:
+        # get the Queue Receiver object for the queue
+        receiver = service_bus_client.get_queue_receiver(queue_name="barclays")
+        async with receiver:
+            while True:
+                received_msgs = await receiver.receive_messages(max_wait_time=5, max_message_count=20)
+                for msg in received_msgs:
+                    print("Received: " + str(msg))
+                    update = json.loads(str(msg))
+                    processes[update["process_id"]] = {
+                        "status": update["status"],
+                        "message": update.get("message", {})
+                    }
+                    # complete the message so that the message is removed from the queue
+                    await receiver.complete_message(msg)
+
+@app.on_event("startup")
+async def startup_event():
+    # Launch the continuous message processor as a background task
+    asyncio.create_task(run())
+
 @app.post("/threads", response_model=ThreadResponse)
 async def create_thread():
     """
@@ -153,12 +183,18 @@ async def simulate_long_process(process_id: str, thread_id:str):
     print(f"Simulating long running process {process_id}")
     # Simulate a long running process
     await asyncio.sleep(10)
-    processes[process_id]["status"] = "requires action"
-    processes[process_id]["message"] = {
-        "step_name": "Legal department approval",
-        "send_to": "User proxy",
-        "action": "Legal department wants to know what country this feature should be deployed in, USA or UK? Get the response from the user"
-    }
+    
+    sender = service_bus_client.get_queue_sender(queue_name="barclays")
+    message = ServiceBusMessage(json.dumps({
+        "process_id": process_id,
+        "status": "requires action",
+        "message": {
+"step_name": "Legal department approval",
+"send_to": "User proxy",
+"action": "Legal department wants to know what country this feature should be deployed in, USA or UK? Get the response from the user"
+}
+    }))
+    await sender.send_messages(message)
 
 @app.post("/chat", response_model=ChatResponse)
 async def chat(chat_request: ChatRequest, background_tasks: BackgroundTasks):
