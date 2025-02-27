@@ -39,20 +39,21 @@ class ChatResponse(BaseModel):
 class Process(BaseModel):
     process_id: str
     status: str
+    message: dict
 
 # initialize AIProjectClient
 project_client = AIProjectClient.from_connection_string(
         credential=DefaultAzureCredential(),
         conn_str=os.getenv("project_connection_string"))
     
-def check_process_status(process_id: str):
+def check_process_inbox(process_id: str):
     """
     Checks the status of a given process.
     :param process_id (str): The ID of the process to check.
-    :return: status
+    :return: inbox_messages
     :rtype: str
     """
-    return processes.get(process_id, "not found")
+    return json.dumps(processes.get(process_id))
 
 
 def start_long_running_process(feature_spec: str, thread_id: str = None, background_tasks: BackgroundTasks = None):
@@ -71,11 +72,12 @@ def start_long_running_process(feature_spec: str, thread_id: str = None, backgro
     print(f"Starting long running process {process_id}")
     if background_tasks:
         background_tasks.add_task(simulate_long_process, process_id, thread_id)
-    processes[process_id] = "running"
+    processes[process_id] = {"status": "running",
+                             "message":{}}
     
     return process_id
 
-agent_functions = FunctionTool([start_long_running_process])
+agent_functions = FunctionTool([start_long_running_process, check_process_inbox])
 # Check if agent exists, if not, create it
 agent_id = os.getenv("agent_id")
 
@@ -83,13 +85,14 @@ def create_agent():
     """
     Creates a new agent with the specified model and instructions.
     """
-    project_client.agents.create_agent(
+    ag = project_client.agents.create_agent(
         model=os.getenv("model_deployment"),
         name=os.getenv("agent_name"),
         instructions=SYSTEM_PROMPT,
         tools=agent_functions.definitions,
         headers={"x-ms-enable-preview": "true"}
     )
+    return ag
 
 if agent_id and agent_id !="":
     try:
@@ -150,21 +153,12 @@ async def simulate_long_process(process_id: str, thread_id:str):
     print(f"Simulating long running process {process_id}")
     # Simulate a long running process
     await asyncio.sleep(10)
-    project_client.agents.create_message(thread_id=thread_id,
-                                         role="assistant",
-                                         content=f"""
-                                         {{"process_id": {{process_id}}, 
-                                          "steps": 
-                                          [{{
-                                              "step_name": "Legal department approval",
-                                                "status": "requires action",
-                                                "send_to": "User proxy"
-                                                "action": "Legal department wants to know what country this feature should be deployed in, USA or UK? Get the response from the user"
-                                          }},
-                                          ]
-                                         }}
-                                        """)  # 10 seconds delay for simulation
-    processes[process_id] = "completed"
+    processes[process_id]["status"] = "requires action"
+    processes[process_id]["message"] = {
+        "step_name": "Legal department approval",
+        "send_to": "User proxy",
+        "action": "Legal department wants to know what country this feature should be deployed in, USA or UK? Get the response from the user"
+    }
 
 @app.post("/chat", response_model=ChatResponse)
 async def chat(chat_request: ChatRequest, background_tasks: BackgroundTasks):
@@ -251,6 +245,6 @@ async def get_processes():
     """
     Returns a list of all processes with their current statuses.
     """
-    return [Process(process_id=pid, status=status) for pid, status in processes.items()]
+    return [Process(process_id=pid, status=info["status"], message=info["message"]) for pid, info in processes.items()]
 
 
