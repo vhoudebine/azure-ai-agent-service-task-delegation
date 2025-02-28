@@ -1,4 +1,3 @@
-# /home/vhoudebine/projects/agents/human_in_the_loop/barclays/app/backend/prompts.py
 
 SYSTEM_PROMPT = """
 You are an AI Agent helping product manager create new feature specifications for a product.
